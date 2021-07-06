@@ -6,12 +6,13 @@ import jwt
 from rest_framework.authentication import BaseAuthentication
 from django.conf import settings
 
-class JWTAuthentication(BaseAuthentication):
+class   JWTAuthentication(BaseAuthentication):
     @staticmethod
     def generate_access_token(user):
         access_token_payload = {
             "type": "access",
             "user_id": user.id,
+            'company_id': user.company.id,
             "exp": (datetime.utcnow() + timedelta(minutes=15)).timestamp(),
             "int": datetime.utcnow().timestamp()
         }

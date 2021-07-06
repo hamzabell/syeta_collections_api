@@ -4,9 +4,9 @@ from .authentication import JWTAuthentication
 from rest_framework.serializers import Serializer
 from .models import Company, Permission, Role, User
 from rest_framework.views import APIView
-from .serializers import CompanySerializer, LoginSerializer, PermissionSerializer, RoleSerializer, UserSerializer
+from .serializers import CompanySerializer, LoginSerializer, PasswordSerializer, PermissionSerializer, RoleSerializer, UserSerializer
 from rest_framework.response import Response
-from rest_framework import exceptions, generics
+from rest_framework import exceptions, generics, status
 from rest_framework.permissions import IsAuthenticated
 import jwt
 
@@ -57,6 +57,23 @@ class UserAPIView(APIView):
         data = User.objects.filter(pk=pk).first()
         serializer = UserSerializer(data)
         return Response(serializer.data)
+
+    def put(self, request, pk=None, format=None):
+        if pk is None:
+            raise exceptions.APIException("Please pass pk in params")
+
+        if request.data.get('password') is not None:
+            raise exceptions.APIException("You cannot update password here")
+
+        
+        user  = User.objects.get(pk=pk)
+        print(user)
+        serializer = UserSerializer(instance=user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data)
+        
 
 
 class LoginAPIView(APIView):
@@ -109,5 +126,40 @@ class RefreshTokenAPIView(APIView):
 
         return response
     
+class UserInfoAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def get(self, request, format=None):
+        user = User.objects.get(pk=request.user.id)
+        if not user:
+            raise exceptions.APIException('Please try and login again. An Error occurred')
+        serializer = UserSerializer(user)
+
+        return Response(serializer.data)
+
+
 
         
+class PasswordChangeAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        data = request.data
+        user = User.objects.get(pk=request.user.id)
+        serializer = PasswordSerializer(data=data)
+
+        if serializer.is_valid():
+            password = serializer.data.get('password')
+            confirm_pasword = serializer.data.get('confirm_password')
+
+            if password != confirm_pasword:
+                raise exceptions.APIException('Password and Confirm Password are not the same')
+
+            print(user)
+
+            user.set_password(password)
+            user.save()
+
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(serializer.error_messages,status=status.HTTP_400_BAD_REQUEST)
